@@ -1,88 +1,60 @@
-let todoList = document.querySelector(".todo-list");
+const todoWrapEl = document.querySelector(".todo-list");
+const FormEl = document.querySelector('.create-form');
+console.log(FormEl);
 
-const todoForm = document.getElementById("todoForm");
-const todoTableBody = document.getElementById("todoTableBody");
-const searchInput = document.querySelector('[data-field="search"]');
-let FormEL = document.querySelector(".create-form");
+const Base_url = "https://biyovo1194.pythonanywhere.com/api/v1/tasks/";
 
-let twoEl = document.querySelector("#two");
-console.log(twoEl);
-
-// Formani yuborish (Vazifa qo'shish)
-FormEL.addEventListener("submit", async (e) => {
+FormEl.addEventListener('submit', (e) => {
   e.preventDefault();
 
-  let formData = new FormData(FormEL);
+  let formData = new FormData(FormEl);
 
   let newTodo = {
     title: formData.get("title"),
     description: formData.get("description"),
     completed: false,
   };
-
-  await createTodo(newTodo);
-  await getElement();
-  FormEL.reset();
+  postTodo(newTodo);
+  getTodos()
 });
 
-// Ma'lumotlarni serverdan olish
-async function getElement() {
-  try {
-    let response = await fetch(
-      "https://pythonanywhere.com",
-      {
-        method: "GET",
-        headers: {
-          "Accept": "application/json"
-        }
-      }
-    );
-    if (!response.ok) {
-      throw new Error("malumot olishda xatolik");
-    }
-    let data = await response.json();
 
-    updataUi(data.data.results);
-    console.log(data.data.results);
-    if (twoEl) {
-      twoEl.textContent = data.data.results.length;
+// 1. Todo olish (GET)
+async function getTodos() {
+  try {
+    let response = await fetch(Base_url);
+
+    if (!response.ok) {
+      throw new Error("api kelmadi");
     }
+
+    let data = await response.json();
+    UpdateUi(data.data.results);
+    console.log(data.data.results);
+
   } catch (error) {
     console.log(error);
   }
 }
-getElement();
+getTodos();
 
-// Vazifani o'chirish
-async function deletedTodo(id) {
-  try {
-    const response = await fetch(
-      `https://pythonanywhere.com${id}/`,
-      {
-        method: "DELETE",
-        headers: {
-          "Accept": "application/json"
-        }
-      },
-    );
 
-    if (response.ok || response.status === 204) {
-      await getElement();
-    }
-  } catch (error) {
-    console.error("DELETE xato:", error);
+function UpdateUi(arr) {
+  todoWrapEl.innerHTML = "";
+  
+  if (!arr || arr.length === 0) {
+    todoWrapEl.innerHTML = "<li>Todo-lar mavjud emas.</li>";
+    return;
   }
-}
 
-// UI (interfeys)ni yangilash
-function updataUi(arr) {
-  todoList.innerHTML = "";
-
-  arr.forEach((todo) => {
+  arr.forEach(todo => {
+    console.log(todo);
     let { id, title, description, completed, created_at } = todo;
-    let formattedDate = created_at ? created_at.split("T")[0] : "Noma'lum";
 
-    todoList.innerHTML += `    <li class="todo-item" data-id="${id}" data-completed="${completed}">
+    let formattedDate = created_at ? created_at.split("T")[0] : "Sana yo'q";
+
+    todoWrapEl.innerHTML += `
+    <li class="todo-item" data-id="${id}" data-completed="${completed}"> 
               <button
                 class="check"
                 type="button"
@@ -94,11 +66,11 @@ function updataUi(arr) {
 
               <div class="todo-content">
                 <div class="todo-top">
-                  <h3 class="todo-title">${title}</h3>
-                  <span class="badge badge-active">${completed ? "Done" : "Active"}</span>
+                  <h3 class="todo-title">${title || "Sarlavhasiz"}</h3>
+                  <span class="badge ${completed ? 'badge-completed' : 'badge-active'}">${completed ? "Done" : "Active"}</span>
                 </div>
                 <p class="todo-desc">
-                ${description || ""}
+                  ${description || "Tavsif yo'q"}
                 </p>
 
                 <div class="meta">
@@ -123,7 +95,7 @@ function updataUi(arr) {
                   ✎
                 </button>
                 <button
-                  onclick="deletedTodo('${id}')"
+                  onclick="deleteTodo(${id})"
                   class="icon-btn danger"
                   type="button"
                   title="Delete"
@@ -132,44 +104,56 @@ function updataUi(arr) {
                   🗑
                 </button>
               </div>
-            </li>`;
+            </li>  
+    `;
   });
 }
 
-// Yangi vazifa yaratish
-async function createTodo(todo) {
+
+
+async function deleteTodo(id) {
+  console.log("O'chirilayotgan ID:", id);
   try {
-    const response = await fetch(
-      "https://pythonanywhere.com",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
-        body: JSON.stringify(todo),
+    let response = await fetch(`${Base_url}${id}/`, {
+      method: 'DELETE',
+    });
+
+    if (response.status === 200 || response.status === 204) {
+      alert(`Todo ${id} ochirildi`);
+      getTodos(); 
+    } else {
+      alert(`O'chirishda xatolik: Server ${response.status} javobini qaytardi`);
+    }
+  } catch (error) {
+    console.log(`Todo ${id} ochirishda muammo bor`, error);
+  }
+}
+
+
+// 4. Todo qo'shish (POST)
+async function postTodo(todo) {
+  console.log("Yuborilayotgan ma'lumot:", todo);
+
+  try {
+    let response = await fetch(Base_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify(todo)
+    });
+
+    if (!response.ok) {
+      throw new Error("Ma'lumot saqlanmadi");
+    }
 
     const data = await response.json();
-    console.log("Server javobi:", data);
-    alert(`${todo.title} qo'shildi`);
+    console.log("Qo'shildi:", data);
+    
+    FormEl.reset(); 
+    getTodos(); 
+
   } catch (error) {
     console.log(error);
   }
 }
-
-// Qidiruv tizimi
-searchInput.addEventListener("input", () => {
-  const q = searchInput.value.toLowerCase().trim();
-
-  const allItems = todoList.querySelectorAll(".todo-item");
-  allItems.forEach((li) => {
-    const title = li.querySelector(".todo-title").textContent.toLowerCase();
-    if (title.includes(q)) {
-      li.style.display = "";
-    } else {
-      li.style.display = "none";
-    }
-  });
-});
